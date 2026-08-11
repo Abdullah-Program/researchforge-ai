@@ -1,5 +1,3 @@
-# .gitignore file banao
-cat > .gitignore << 'EOF'
 # Dependencies
 frontend/node_modules/
 __pycache__/
@@ -8,10 +6,10 @@ __pycache__/
 .env
 
 # Data (large files)
+data/papers/
 data/vector_store/
 data/chroma_db/
-*.db
+data/*.db
 
 # Build
 frontend/dist/
-EOF
