@@ -1,3 +1,5 @@
+const API_BASE = import.meta.env.VITE_API_URL || ''
+
 import { useEffect, useRef, useState, useCallback } from 'react'
 
 export default function AnalyticsPage() {
@@ -8,7 +10,7 @@ export default function AnalyticsPage() {
   const loadAnalytics = useCallback(() => {
     setLoading(true)
     setError(null)
-    fetch('/analytics')
+    fetch(`${API_BASE}/analytics`)
       .then(r => {
         if (!r.ok) throw new Error(`HTTP ${r.status}`)
         return r.json()

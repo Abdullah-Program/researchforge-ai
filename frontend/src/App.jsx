@@ -29,7 +29,7 @@ export default function App() {
     let timer = null
     async function checkHealth() {
       try {
-        const r = await fetch('/health')
+        const r = await fetch(`${API_BASE}/health`)
         if (r.ok && !cancelled) {
           setBackendReady(true)
           return
@@ -44,7 +44,7 @@ export default function App() {
   // Fetch all sessions once backend is ready
   useEffect(() => {
     if (!backendReady) return
-    fetch('/sessions')
+    fetch(`${API_BASE}/sessions`)
       .then(r => r.json())
       .then(data => {
         setSessions(data)
@@ -62,7 +62,7 @@ export default function App() {
     setActiveNode(null)
     vizRef.current?.resetAll()
     
-    fetch(`/sessions/${sessionId}/messages`)
+    fetch(`${API_BASE}/sessions/${sessionId}/messages`)
       .then(r => r.json())
       .then(messages => {
         const mapped = messages.map(m => ({
@@ -88,7 +88,7 @@ export default function App() {
 
   function handleCreateSession() {
     const title = `Chat_${Date.now().toString().slice(-4)}`
-    fetch(`/sessions?title=${encodeURIComponent(title)}`, { method: 'POST' })
+    fetch(`${API_BASE}/sessions?title=${encodeURIComponent(title)}`, { method: 'POST' })
       .then(r => r.json())
       .then(data => {
         const newSession = { id: data.session_id, title, created_at: new Date().toISOString() }
@@ -104,7 +104,7 @@ export default function App() {
   }
 
   function handleDeleteSession(sessionId) {
-    fetch(`/sessions/${sessionId}`, { method: 'DELETE' })
+    fetch(`${API_BASE}/sessions/${sessionId}`, { method: 'DELETE' })
       .then(() => {
         setSessions(prev => prev.filter(s => s.id !== sessionId))
         if (currentSessionId === sessionId) {
@@ -128,7 +128,7 @@ export default function App() {
     if (!activeSession) {
       try {
         const title = q.slice(0, 26) + (q.length > 26 ? '...' : '')
-        const r = await fetch(`/sessions?title=${encodeURIComponent(title)}`, { method: 'POST' })
+        const r = await fetch(`${API_BASE}/sessions?title=${encodeURIComponent(title)}`, { method: 'POST' })
         const data = await r.json()
         activeSession = data.session_id
         const newSession = { id: activeSession, title, created_at: new Date().toISOString() }
@@ -162,7 +162,7 @@ export default function App() {
     let finalArxivFetched  = false
     let finalArxivStatus   = null
 
-    const es = new EventSource(`/query/stream?question=${encodeURIComponent(q)}&session_id=${activeSession}`)
+    const es = new EventSource(`${API_BASE}/query/stream?question=${encodeURIComponent(q)}&session_id=${activeSession}`)
 
     es.onmessage = (e) => {
       if (e.data === '[DONE]') {
