@@ -5,6 +5,7 @@ import PipelinePanel  from './components/PipelinePanel.jsx'
 import DocumentsPage  from './components/DocumentsPage.jsx'
 import PipelineViz    from './components/PipelineViz.jsx'
 import AnalyticsPage  from './components/AnalyticsPage.jsx'
+const API_BASE = import.meta.env.VITE_API_URL || 'https://researchforge-ai-production.up.railway.app'
 
 export default function App() {
   const [activePage,  setActivePage]  = useState('chat')

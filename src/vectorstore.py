@@ -24,6 +24,10 @@ from ingestion import get_embedding_model   # reuse same model instance
 # ── Constants ─────────────────────────────────────────────────────────────────
 VECTOR_STORE_DIR = Path(__file__).resolve().parent.parent / "data" / "vector_store"
 COLLECTION_NAME  = "arxiv_papers"
+# A safe fallback for ChromaDB versions that do not expose their configured limit.
+DEFAULT_WRITE_BATCH_SIZE = 1_000
+# Metadata reads must also stay below SQLite's parameter limit on large stores.
+METADATA_READ_BATCH_SIZE = 1_000
 
 
 # ── BM25 Sparse Search Helpers ────────────────────────────────────────────────
@@ -145,13 +149,26 @@ class VectorStore:
             texts.append(doc.page_content)
             vecs.append(emb.tolist())
 
-        # ChromaDB add (handles duplicates via unique IDs)
-        self.collection.add(
-            ids=ids,
-            embeddings=vecs,
-            metadatas=metas,
-            documents=texts,
-        )
+        # ChromaDB rejects writes larger than its configured max batch size.  A
+        # full-folder ingest can easily exceed that limit, so write the prepared
+        # payload in batches.  Querying the client keeps this compatible with
+        # custom ChromaDB configurations; the fallback supports older versions.
+        try:
+            batch_size = self.client.get_max_batch_size()
+        except (AttributeError, TypeError):
+            batch_size = DEFAULT_WRITE_BATCH_SIZE
+
+        if not isinstance(batch_size, int) or batch_size < 1:
+            batch_size = DEFAULT_WRITE_BATCH_SIZE
+
+        for start in range(0, len(ids), batch_size):
+            end = start + batch_size
+            self.collection.add(
+                ids=ids[start:end],
+                embeddings=vecs[start:end],
+                metadatas=metas[start:end],
+                documents=texts[start:end],
+            )
 
         added = len(documents)
         print(f"[vectorstore] Added {added} chunks. Total: {self.collection.count()}")
@@ -302,9 +319,25 @@ class VectorStore:
         if self.collection.count() == 0:
             return []
 
-        all_meta = self.collection.get(include=["metadatas"])["metadatas"]
-        papers   = sorted({m.get("source_file", "unknown") for m in all_meta})
-        return papers
+        total = self.collection.count()
+        papers = set()
+
+        # Calling get() without a limit makes ChromaDB build an oversized SQLite
+        # query once the collection has thousands of chunks.  Page through the
+        # metadata instead; only filenames are needed for this endpoint.
+        for offset in range(0, total, METADATA_READ_BATCH_SIZE):
+            result = self.collection.get(
+                include=["metadatas"],
+                limit=METADATA_READ_BATCH_SIZE,
+                offset=offset,
+            )
+            papers.update(
+                metadata.get("source_file", "unknown")
+                for metadata in result.get("metadatas", [])
+                if metadata
+            )
+
+        return sorted(papers)
 
     def count(self) -> int:
         """Total chunks stored."""
